@@ -1,0 +1,88 @@
+version: "3.3"
+
+services:
+  mqtt:
+    image: eclipse-mosquitto
+    ports:
+      - "11883:1883"
+      - "19001:9001"
+    networks:
+      - iot
+    volumes:
+      - mosquitto-data:/mosquitto/data
+      - mosquitto-log:/mosquitto/log
+      - ./mqtt-conf/mosquitto.conf:/mosquitto/config/mosquitto.conf
+
+  openhab:
+    image: "openhab/openhab:2.5.5"
+    restart: always
+    networks:
+      - iot
+      - frontend
+    ports:
+      - "8080:8080"
+      - "8443:8443"
+    volumes:
+      - "/etc/localtime:/etc/localtime:ro"
+      - "/etc/timezone:/etc/timezone:ro"
+      - openhab-addons:/openhab/addons
+      - openhab-conf:/openhab/conf
+      - openhab-userdata:/openhab/userdata
+    environment:
+      OPENHAB_HTTP_PORT: "8080"
+      OPENHAB_HTTPS_PORT: "8443"
+      EXTRA_JAVA_OPTS: "-Duser.timezone=Europe/Berlin"
+    links:
+      - mqtt
+      - influxdb
+
+  nodered:
+    image: nodered/node-red
+    restart: always
+    networks:
+      - iot
+    ports:
+      - "1880:1880"
+    volumes:
+      - nodered-data:/data
+    links:
+      - influxdb
+
+  influxdb:
+    image: influxdb
+    restart: always
+    networks:
+      - iot
+    volumes:
+      - influxdb:/var/lib/influxdb
+      - appo:/appo
+    ports:
+      - "8086:8086"
+
+  graphana:
+    image: grafana/grafana
+    restart: always
+    ports:
+      - "3000:3000"
+    networks:
+      - iot
+      - frontend
+    links:
+      - influxdb
+
+volumes:
+  mosquitto-data:
+  mosquitto-log:
+  openhab-addons:
+  openhab-conf:
+  openhab-userdata:
+  nodered-data:
+  influxdb:
+  appo:
+    driver_opts:
+      type: "nfs"
+      o: "addr=192.168.1.251,rw"
+      device: ":/export/Appo"
+networks:
+  iot:
+  frontend:
